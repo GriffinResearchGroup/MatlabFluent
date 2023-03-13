@@ -1,62 +1,105 @@
-% This script will read steady state report file data from a Fluent run,
-% plot each coefficient vs iteration, and output the final values to the
-% command window
+% This script will parse a report file from ANSYS Fluent. Currently it can
+% deal with unsteady or steady cases, and it will check to see if all
+% coefficients were reported, or just drag, lift, and pitching moment.
+% This is for coefficients reported in the global coordinate system.
+
 clear
 
-% Prompt user to select .txt file to work with
-[FileName,PathName,FilterIndex] = uigetfile('*.txt');
-% Change the working directory to where this file exists
-cd(PathName)
-dmg = "DS1";
-test = regexp(PathName,filesep,'split');
-test = char(test(end-1));
-switch test
-    case 'n15aoa'
-        aoa = -15;
-    case 'n10aoa'
-        aoa = -10;
-    case 'n05aoa'
-        aoa = -5;
-    case '00aoa'
-        aoa = 0;
-    case '05aoa'
-        aoa = 5;
-    case '10aoa'
-        aoa = 10;
-    case '15aoa'
-        aoa = 15;
+FileName = 'G:\Shared drives\ONR\CFD\ANSYS\fluent\config2A\WTscale\baseline\dev\M0.07-WT-D900001-R500-P500-Y500-16aoa\report-file.txt';
+% Check file to see if it is unsteady data
+filetext = fileread(FileName);
+string = 'Time Step';
+US = strfind(filetext,string);
+% Read the CFD file contents
+Data = readmatrix(FileName,'NumHeaderLines',3);
+% count the number of columns to check what data I printed out
+[rows,cols] = size(Data);
+if isempty(US) % if steady data
+    if cols == 4
+        % plot results
+        f = figure;           
+        plot(Data(:,1),Data(:,2),'k-o','DisplayName','$C_D$')
+        hold on
+        plot(Data(:,1),Data(:,3),'b--+','DisplayName','$C_L$')
+        plot(Data(:,1),Data(:,4),'g-..','DisplayName','$C_m$')
+        x = xlabel('Iteration');
+        l = legend('Location','best');
+        grid on
+        grid minor
+        ax = gca;
+        ax.FontSize = 16;
+        x.FontSize = 20;
+        l.FontSize = 20;
+        set(l,'Interpreter','latex')
+        %ylim([-inf 2])
+    else
+        % plot results
+        f = figure;
+        plot(Data(:,1),Data(:,2),'k-o','DisplayName','$C_D$')
+        hold on
+        plot(Data(:,1),Data(:,3),'b--+','DisplayName','$C_L$')
+        plot(Data(:,1),Data(:,4),'g-.*','DisplayName','$C_m$')
+        plot(Data(:,1),Data(:,5),'r-x','DisplayName','$C_l$')
+        plot(Data(:,1),Data(:,6),'c--s','DisplayName','$C_n$')
+        plot(Data(:,1),Data(:,7),'m-.^','DisplayName','$F_y$')
+        x = xlabel('Iteration');
+        l = legend('Location','best');
+        grid on
+        grid minor
+        ax = gca;
+        ax.FontSize = 16;
+        x.FontSize = 20;
+        l.FontSize = 20;
+        set(l,'Interpreter','latex')
+        % Calculate Drag and Lift coefficients
+        alpha = 0;
+        %CD = Data(:,3)*sind(alpha) + Data(:,2)*cosd(alpha);
+        %CL = Data(:,3)*cosd(alpha) - Data(:,2)*sind(alpha);
+    end
+else % if unsteady data
+    if cols == 5
+        % Move data into timestep, time, drag, lift, pitch-mom
+        Data = Data(:,[1 5 2 3 4]);
+        % plot results
+        f = figure;
+        plot(Data(:,2),Data(:,3),'k-o','DisplayName','$C_D$')
+        hold on
+        plot(Data(:,2),Data(:,4),'b--+','DisplayName','$C_L$')
+        plot(Data(:,2),Data(:,5),'g-..','DisplayName','$C_m$')
+        x = xlabel('Time (s)');
+        l = legend('Location','best');
+        grid on
+        grid minor
+        ax = gca;
+        ax.FontSize = 16;
+        x.FontSize = 20;
+        l.FontSize = 20;
+        set(l,'Interpreter','latex')
+    else
+        % plot results
+        f = figure;
+        plot(Data(:,8),Data(:,2),'k-o','DisplayName','$C_D$')
+        hold on
+        plot(Data(:,8),Data(:,3),'b--+','DisplayName','$C_L$')
+        plot(Data(:,8),Data(:,4),'g-.*','DisplayName','$C_m$')
+        plot(Data(:,8),Data(:,5),'r-x','DisplayName','$C_l$')
+        plot(Data(:,8),Data(:,6),'c--s','DisplayName','$C_n$')
+        plot(Data(:,8),Data(:,7),'m-.^','DisplayName','$F_y$')
+        x = xlabel('Time (s)');
+        l = legend('Location','best');
+        grid on
+        grid minor
+        ax = gca;
+        ax.FontSize = 16;
+        x.FontSize = 20;
+        l.FontSize = 20;
+        set(l,'Interpreter','latex')
+        ylim([-10 10])
+        % Calculate Drag and Lift coefficients
+        alpha = 0;
+        %CD = Data(:,3)*sind(alpha) + Data(:,2)*cosd(alpha);
+        %CL = Data(:,3)*cosd(alpha) - Data(:,2)*sind(alpha);
+    end
 end
-% Read the file contents, skipping header lines
-Data = dlmread(FileName,' ',3,0);
-% Move data into iteration, drag, lift, slip, pitch-mom, roll-mom, yaw-mom
-Data = Data(:,[1 2 3 7 4 5 6]);
-% Switch sign of slip, pitch-mom, and yaw-mom
-% This is due to fluent having flipped coordinate system
-flipped = 1;  %flag for flipped coordinate system
-if flipped == 1
-    Data(:,4) = -Data(:,4);
-    Data(:,5) = -Data(:,5);
-    Data(:,7) = -Data(:,7);
-end
-% Plot the data
-f = figure;
-plot(Data(:,1),Data(:,2),'k-o','DisplayName','CD')
-hold on
-plot(Data(:,1),Data(:,3),'b--+','DisplayName','CL')
-plot(Data(:,1),Data(:,4),'r:*','DisplayName','Cy')
-plot(Data(:,1),Data(:,5),'g-..','DisplayName','Cm')
-plot(Data(:,1),Data(:,6),'m-x','DisplayName','Cl')
-plot(Data(:,1),Data(:,7),'c--s','DisplayName','Cn')
-xlabel('Iteration')
-legend('Location','northeast')
-%ylim([-3 3])
-grid on
-grid minor
-ax = gca;
-ax.FontSize = 24;
-% Print final values of coefficients
-% Get size of Data array
-[row,col] = size(Data);
-T = table(aoa,dmg,Data(row,2),Data(row,3),Data(row,4),Data(row,5),Data(row,6),Data(row,7),'VariableNames',{'aoa','damage','CD','CL','Cy','Cm','Cl','Cn'})
-M = [aoa,dmg,Data(row,2),Data(row,3),Data(row,4),Data(row,5),Data(row,6),Data(row,7)];
-writematrix(M,'G:\Shared drives\ONR\CFD\ANSYS\fluent\config2A_WT\v4\coefficients.txt','WriteMode','append','Delimiter','tab');
+
+f.Position = [100 100 900 600];
